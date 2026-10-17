@@ -112,23 +112,27 @@ async def tts(narration: str) -> bytes:
             return await response.read()
 
 
-async def speak(channel, voice, narration):
+async def speak(channel, voice, narration, title):
     audio = await tts(narration)
     with tempfile.TemporaryDirectory(prefix="nerv-audio-") as temp_dir:
         lesson_mp3 = Path(temp_dir) / "lesson.mp3"
         lesson_mp3.write_bytes(audio)
         await play_file(voice, lesson_mp3)
-        await channel.send("🎧 **Replay this round**", file=discord.File(lesson_mp3))
+        await channel.send(embed=discord.Embed(
+            title=f"🎧 {title[:240]}",
+            description="Replay this round.",
+            color=discord.Color.blurple(),
+        ), file=discord.File(lesson_mp3), allowed_mentions=discord.AllowedMentions.none())
 
 
-async def send_sources(channel, sources):
+async def send_sources(channel, title, sources):
     links = []
-    for index, (title, url) in enumerate(sources, 1):
-        label = discord.utils.escape_markdown(" ".join(title.split())[:90]).replace("[", "").replace("]", "")
+    for index, (source_title, url) in enumerate(sources, 1):
+        label = discord.utils.escape_markdown(" ".join(source_title.split())[:90]).replace("[", "").replace("]", "")
         link = url.replace("(", "%28").replace(")", "%29")
         links.append(f"**{index}.** [{label}]({link})")
     await channel.send(embed=discord.Embed(
-        title="📚 Research sources",
+        title=f"📚 {title[:240]}",
         description="\n".join(links),
         color=discord.Color.blurple(),
     ), allowed_mentions=discord.AllowedMentions.none())
@@ -142,11 +146,11 @@ async def send_round_finished(channel):
     ))
 
 
-async def run_round(interaction: discord.Interaction, prompt: str) -> str:
+async def run_round(interaction: discord.Interaction, title: str, prompt: str) -> str:
     notes, sources = await research(prompt)
     narration = await write_lesson(prompt, notes)
-    await send_sources(interaction.channel, sources)
-    await speak(interaction.channel, interaction.guild.voice_client, narration)
+    await send_sources(interaction.channel, title, sources)
+    await speak(interaction.channel, interaction.guild.voice_client, narration, title)
     await send_round_finished(interaction.channel)
     return narration
 
@@ -172,7 +176,7 @@ async def learn(interaction: discord.Interaction, topic: str) -> None:
         color=discord.Color.blurple(),
     ), ephemeral=True)
     async with round_lock:
-        narration = await run_round(interaction, f"Teach me about: {topic}")
+        narration = await run_round(interaction, topic, f"Teach me about: {topic}")
         lessons[interaction.guild_id] = (topic, narration)
 
 
@@ -188,7 +192,7 @@ async def ask(interaction: discord.Interaction, question: str) -> None:
     async with round_lock:
         topic, previous = lessons[interaction.guild_id]
         prompt = f"Current lesson topic: {topic}\nPrevious answer: {previous[:12000]}\nQuestion: {question}"
-        narration = await run_round(interaction, prompt)
+        narration = await run_round(interaction, question, prompt)
         lessons[interaction.guild_id] = (topic, narration)
 
 
