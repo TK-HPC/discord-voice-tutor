@@ -1,0 +1,13 @@
+[project]
+name = "nerv-voice-tutor"
+version = "0.1.0"
+description = "A local Discord voice tutor powered by OpenRouter"
+requires-python = ">=3.14"
+dependencies = [
+    "aiohttp>=3.13,<4",
+    "discord.py[voice]>=2.6,<3",
+    "python-dotenv>=1.1,<2",
+]
+
+[tool.uv]
+package = false
